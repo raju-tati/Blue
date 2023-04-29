@@ -1,13 +1,23 @@
 use strict;
 use warnings;
+use utf8;
 use experimentals;
-use threads;
 use Time::HiRes;
+use threads;
+
+sub fileContent($fileName) {
+    my $contents;
+    open( my $fh, '<', $fileName ) or die "Cannot open torrent $fileName";
+    {
+        local $/;
+        $contents = <$fh>;
+    }
+    close($fh);
+    return $contents;
+}
 
 sub main() {
-    async {
-        say "printing inside a thread";
-    };
+    say "Blue >>";
 }
 
 my $signalThread = async {
