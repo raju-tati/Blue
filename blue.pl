@@ -45,7 +45,7 @@ __END__
 =pod
 =head1 FUNCTIONS
 
-    edit the functions without starting _.
+    edit the functions not starting with _.
     functions starting with _ are private.
     function staring with __ are for export.
 
