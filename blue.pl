@@ -42,7 +42,9 @@ sub properTorrent($torrentPath) {
 }
 
 sub getInfoHash($infoKey) {
-    my $infoHash = Encode::encode("ISO-8859-1", sha1(bencode($infoKey)));
+    my $bencodeInfoKey = bencode($infoKey);
+    my $shaInfoKey = sha1($bencodeInfoKey);
+    my $infoHash = Encode::encode("ISO-8859-1", $shaInfoKey);
     return $infoHash;
 }
 
