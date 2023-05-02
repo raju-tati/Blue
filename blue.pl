@@ -5,10 +5,14 @@ use experimentals;
 use Time::HiRes;
 use threads;
 use threads::shared;
+use Bencode qw(bencode bdecode);
+use LWP::Simple qw(get);
+use Encode;
+use Digest::SHA::PurePerl qw(sha1);
 
 my $startTime :shared = time();
 
-sub __fileContent($fileName) {
+sub fileContent($fileName) {
     my $contents;
     open( my $fh, '<', $fileName ) or die "Cannot open torrent $fileName";
     {
@@ -19,13 +23,13 @@ sub __fileContent($fileName) {
     return $contents;
 }
 
-sub __printUsage() {
+sub printUsage() {
     say "Usage example:";
     say "blue.pl -t path/to/torrent.torrent";
     say "blue.pl -m magentLink";
 }
 
-sub __properTorrent($torrentPath) {
+sub properTorrent($torrentPath) {
     if(substr($torrentPath, -8) eq ".torrent") {
         if(-e $torrentPath) {
             return 1;
@@ -37,28 +41,74 @@ sub __properTorrent($torrentPath) {
     }
 }
 
+sub getInfoHash($infoKey) {
+    my $infoHash = Encode::encode("ISO-8859-1", sha1(bencode($infoKey)));
+    return $infoHash;
+}
+
+sub getTrackerRequest($torrentContent) {
+    my $announce = $torrentContent->{"announce"};
+    my $port = 6881;
+    my $left = $torrentContent->{"info"}->{"length"};
+    my $uploaded = 0;
+    my $downloaded = 0;
+    my $peerId = "-AZ2200-6wfG2wk8wWLd";
+
+    my $infoHash = getInfoHash($torrentContent->{"info"});
+
+    my $trackerRequest = 
+            $announce
+          . "?info_hash="
+          . $infoHash
+          . "&peer_id="
+          . $peerId
+          . "&port="
+          . $port
+          . "&uploaded="
+          . $uploaded
+          . "&downloaded="
+          . $downloaded
+          . "&left="
+          . $left;
+    
+    return $trackerRequest;
+}
+
+sub getTrackerResponse($trackerRequest) {
+    my $trackerResponseContent = get($trackerRequest)
+                                    or say "Cannot Connect to tracker";
+    my $trackerResponse = bdecode($trackerResponseContent);
+    return $trackerResponse;
+}
+
 sub downloadTorrent($torrentPath) {
-    say "recieved a proper torrent file";
+    my $torrentFileContent = fileContent($torrentPath);
+    my $torrentContent = bdecode($torrentFileContent);
+    my $trackerRequest = getTrackerRequest($torrentContent);
+    my $trackerResponse = getTrackerResponse($trackerRequest);
+
+    use Data::Printer;
+    p($trackerResponse);
 }
 
 sub main() {
     if(scalar @ARGV != 2) {
-        __printUsage();    
+        printUsage();    
     }
     
     my $magentOrTorrent = $ARGV[0];
     my $linkOrTorrent = $ARGV[1];
 
     if($magentOrTorrent eq "-t") {
-        if(__properTorrent($linkOrTorrent)) {
+        if(properTorrent($linkOrTorrent)) {
             downloadTorrent($linkOrTorrent);
         } else {
-            __printUsage();
+            printUsage();
         }
     } elsif($magentOrTorrent eq "-m") {
         say "got a magnet link";
     } else {
-        __printUsage();
+        printUsage();
     }
 }
 
@@ -72,6 +122,7 @@ sub signalHandler($signalName) {
     my @threads = threads->list(threads::all);
     say "remaining threads: ", scalar @threads;
 }
+
 my $monitorThread = async {
     while(1) {
         foreach my $thread (threads->list(threads::joinable)) {
@@ -80,7 +131,9 @@ my $monitorThread = async {
         Time::HiRes::sleep(0.005);
     }
 };
+
 main();
+
 while(1) {
     my @threads = threads->list(threads::all);
     if(scalar @threads == 1) {
@@ -90,15 +143,14 @@ while(1) {
         Time::HiRes::sleep(0.001);
     }
 }
+
 exit();
 
 __END__
 =encoding utf8
 =pod
-=head1 FUNCTIONS
-
-    edit the functions not starting with _.
-    functions starting with _ are private.
-    function staring with __ are for export.
-
+=head1 USAGE
+    Usage example:
+    blue.pl -t path/to/torrent.torrent
+    blue.pl -m magentLink
 =cut
