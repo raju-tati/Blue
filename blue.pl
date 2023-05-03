@@ -48,7 +48,7 @@ sub getInfoHash($infoKey) {
     return $infoHash;
 }
 
-sub getTrackerRequest($torrentContent) {
+sub trackerRequest($torrentContent) {
     my $announce = $torrentContent->{"announce"};
     my $port = 6881;
     my $left = $torrentContent->{"info"}->{"length"};
@@ -86,7 +86,7 @@ sub getTrackerResponse($trackerRequest) {
 sub downloadTorrent($torrentPath) {
     my $torrentFileContent = fileContent($torrentPath);
     my $torrentContent = bdecode($torrentFileContent);
-    my $trackerRequest = getTrackerRequest($torrentContent);
+    my $trackerRequest = trackerRequest($torrentContent);
     my $trackerResponse = getTrackerResponse($trackerRequest);
 
     use Data::Printer;
@@ -114,15 +114,28 @@ sub main() {
     }
 }
 
+my $keyBoardInput = async {
+    my $input = <STDIN>;
+    chomp $input;
+
+    if($input eq "stats") {
+        say "show stats";
+    }
+};
+
 my $signalThread = async {
-    use sigtrap 'handler' => \&signalHandler, qw(INT);
+    use sigtrap 'handler' => \&signalHandler, qw(INT TSTP);
 };
 # functionName: signalHandler().
-# handles the INT signal form keyboard.
+# handles the INT and TSTP signals form keyboard.
 sub signalHandler($signalName) { 
-    say "got an intterupt, print some info";
-    my @threads = threads->list(threads::all);
-    say "remaining threads: ", scalar @threads;
+    if($signalName eq "INT") {
+        say "recieved an INT(CTRL-C) signal";
+    } elsif($signalName eq "TSTP") {
+        say "recieved TSTP(CTRL-Z) signal";
+    } else {
+        say "recieved ", $signalName, " signal";
+    }
 }
 
 my $monitorThread = async {
@@ -133,26 +146,26 @@ my $monitorThread = async {
         Time::HiRes::sleep(0.005);
     }
 };
-
 main();
-
 while(1) {
     my @threads = threads->list(threads::all);
     if(scalar @threads == 1) {
         $monitorThread->detach();
+        $keyBoardInput->detach();
         last;
     } else {
         Time::HiRes::sleep(0.001);
     }
 }
-
 exit();
 
 __END__
 =encoding utf8
 =pod
+
 =head1 USAGE
-    Usage example:
+
     blue.pl -t path/to/torrent.torrent
     blue.pl -m magentLink
+
 =cut
