@@ -95,7 +95,8 @@ sub downloadTorrent($torrentPath) {
 
 sub main() {
     if(scalar @ARGV != 2) {
-        printUsage();    
+        printUsage();
+        return;
     }
     
     my $magentOrTorrent = $ARGV[0];
@@ -149,7 +150,7 @@ my $monitorThread = async {
 main();
 while(1) {
     my @threads = threads->list(threads::all);
-    if(scalar @threads == 1) {
+    if(scalar @threads == 2) {
         $monitorThread->detach();
         $keyBoardInput->detach();
         last;
